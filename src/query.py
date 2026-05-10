@@ -8,10 +8,9 @@ from langchain_openai import OpenAIEmbeddings
 
 # Imports para LLM y QA Chain
 from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
+from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
 
 logger = logging.getLogger(__name__)
 
