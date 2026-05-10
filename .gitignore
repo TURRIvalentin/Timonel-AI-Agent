@@ -8,8 +8,8 @@ env/
 .env
 .env.local
 
-# Base de datos vectorial
-chroma_db/
+# Base de datos vectorial (no ignorar, se sube pre-generada para Streamlit Cloud)
+# chroma_db/
 *.sqlite3
 *.db
 
