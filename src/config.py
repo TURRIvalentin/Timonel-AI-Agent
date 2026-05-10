@@ -16,7 +16,7 @@ class Config:
     """Clase para centralizar la configuración del sistema."""
     
     # Rutas
-    PDF_DIRECTORY = os.getenv("PDF_DIRECTORY", r"C:\Users\valen\OneDrive\Escritorio\Timonel")
+    PDF_DIRECTORY = os.getenv("PDF_DIRECTORY", "./data")
     CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "./chroma_db")
     
     # Proveedores
