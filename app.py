@@ -2,6 +2,15 @@ import streamlit as st
 import os
 import sys
 
+# --- FIX PARA CHROMADB EN STREAMLIT CLOUD ---
+try:
+    import pysqlite3
+    sys.modules["sqlite3"] = pysqlite3
+except ImportError:
+    pass
+# --------------------------------------------
+
+
 # Agregar src al path para poder importar módulos
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
