@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same branch so a new push doesn't queue
+# behind an already-running check.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint & type-check (ruff + mypy)
+  # Runs the exact same commands as local development and pre-commit hooks.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Ruff — lint
+        run: python -m ruff check src/ tests/ cli.py app.py
+
+      - name: Ruff — format check
+        run: python -m ruff format --check src/ tests/ cli.py app.py
+
+      - name: mypy — type check
+        run: python -m mypy src/ cli.py
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Test suite with coverage
+  # Integration tests (@pytest.mark.integration) are excluded via addopts in
+  # pyproject.toml — they require network/models and must not run in CI.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: pytest — unit tests with coverage
+        run: |
+          python -m pytest tests/ \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml
+
+      # Upload the XML report as a build artifact so it can be downloaded from
+      # the Actions run page.  To add a coverage badge, wire this to Codecov
+      # (see docs/future-work.md — requires a CODECOV_TOKEN secret).
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
