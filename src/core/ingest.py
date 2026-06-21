@@ -9,6 +9,7 @@ beyond disk I/O.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_community.document_loaders import PyPDFLoader
@@ -20,6 +21,19 @@ from src.config import Settings
 from src.core.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class IngestResult:
+    """Summary returned by :func:`ingest` after a successful pipeline run.
+
+    Attributes:
+        pages_loaded: Total PDF pages parsed (one page = one raw Document).
+        chunks_indexed: Number of text chunks embedded and stored in ChromaDB.
+    """
+
+    pages_loaded: int
+    chunks_indexed: int
 
 
 def load_documents(directory: Path) -> list[Document]:
@@ -124,13 +138,16 @@ def build_vector_store(chunks: list[Document], settings: Settings) -> Chroma:
     return vector_store
 
 
-def ingest(settings: Settings) -> None:
+def ingest(settings: Settings) -> IngestResult:
     """Run the full ingest pipeline end-to-end.
 
     Loads PDFs → chunks text → embeds → persists to ChromaDB.
 
     Args:
         settings: Application settings.
+
+    Returns:
+        An :class:`IngestResult` with counts of pages loaded and chunks indexed.
 
     Raises:
         FileNotFoundError: When the configured PDF directory does not exist.
@@ -147,3 +164,4 @@ def ingest(settings: Settings) -> None:
     settings.chroma_db_dir.mkdir(parents=True, exist_ok=True)
     build_vector_store(chunks, settings)
     logger.info("Ingest complete — %d chunks indexed.", len(chunks))
+    return IngestResult(pages_loaded=len(documents), chunks_indexed=len(chunks))

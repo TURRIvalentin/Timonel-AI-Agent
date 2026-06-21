@@ -133,8 +133,38 @@ def setup_qa_chain(settings: Settings) -> Runnable[dict[str, Any], dict[str, Any
     return create_retrieval_chain(retriever, qa_chain)
 
 
+def execute_query(
+    question: str,
+    chain: Runnable[dict[str, Any], dict[str, Any]],
+) -> QueryResult:
+    """Invoke a pre-built QA chain and return a structured result.
+
+    This is the hot-path used by the API, which builds the chain once at
+    startup and caches it.  Use :func:`run_query` as the convenience wrapper
+    for one-shot callers (CLI, scripts) that do not cache the chain.
+
+    Args:
+        question: Natural-language question.
+        chain: Pre-built LangChain retrieval chain.
+
+    Returns:
+        A :class:`QueryResult` with the generated answer and source chunks.
+    """
+    logger.info("Running query: %r", question)
+    raw = chain.invoke({"input": question})
+    return QueryResult(
+        question=question,
+        answer=raw.get("answer", ""),
+        sources=raw.get("context", []),
+    )
+
+
 def run_query(question: str, settings: Settings) -> QueryResult:
-    """Execute a retrieval query and return a structured result.
+    """Build a QA chain from *settings* and execute a single query.
+
+    Convenience wrapper for one-shot callers (CLI, scripts).  For repeated
+    queries, build the chain once with :func:`setup_qa_chain` and call
+    :func:`execute_query` directly to avoid rebuilding on every request.
 
     Args:
         question: Natural-language question to answer.
@@ -144,10 +174,4 @@ def run_query(question: str, settings: Settings) -> QueryResult:
         A :class:`QueryResult` containing the answer and cited source chunks.
     """
     chain = setup_qa_chain(settings)
-    logger.info("Running query: %r", question)
-    raw = chain.invoke({"input": question})
-    return QueryResult(
-        question=question,
-        answer=raw.get("answer", ""),
-        sources=raw.get("context", []),
-    )
+    return execute_query(question, chain)
