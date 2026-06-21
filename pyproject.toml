@@ -4,7 +4,113 @@ version = "0.1.0"
 description = "RAG system for querying nautical PDF documents"
 requires-python = ">=3.10"
 
+# Runtime dependencies live in requirements.txt (kept for Streamlit Cloud
+# compatibility, which reads that file directly).
+# Dev dependencies are declared here so `pip install -e ".[dev]"` installs
+# everything in one shot — no second file to keep in sync.
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+    # SQLAlchemy 2.0 ships its own py.typed stubs — no separate types package needed.
+]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
-# Make `from src.xxx import yyy` work in tests without sys.path hacks.
+# Adds project root to sys.path so tests can use `from src.xxx import yyy`.
 pythonpath = ["."]
 testpaths = ["tests"]
+# Exclude integration tests (require network / real models) by default.
+addopts = "-m 'not integration' --strict-markers"
+markers = [
+    "integration: marks tests that call external APIs or load real models",
+]
+
+# ---------------------------------------------------------------------------
+# Coverage (pytest-cov)
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/__init__.py", "src/db/__init__.py", "src/core/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 99
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (undefined names, unused imports, …)
+    "I",    # isort (import order)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (modernise syntax for target Python version)
+    "B",    # flake8-bugbear (likely bugs and design issues)
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    # Line-length is enforced by the formatter, not the linter.
+    "E501",
+    # False positive: pydantic field defaults often use function calls.
+    "B008",
+    # Ternary is sometimes less readable; keep the author's choice.
+    "SIM108",
+    # UP007: `X | Y` union syntax requires Python 3.10+; we use
+    # `from __future__ import annotations` throughout, so this is safe
+    # but the rule can be noisy in files that mix runtime/annotation usage.
+    "UP007",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+# Our own code must be fully typed.
+disallow_untyped_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false   # LangChain stubs are incomplete; reduce noise.
+strict_equality = true
+# Return-Any from LangChain callables is expected; don't surface that.
+warn_return_any = false
+
+# Third-party packages without type stubs or with incomplete stubs.
+# We silence missing-import errors for each of them individually rather
+# than globally so that any new import in our own code is still caught.
+[[tool.mypy.overrides]]
+module = [
+    "langchain.*",
+    "langchain_community.*",
+    "langchain_core.*",
+    "langchain_openai.*",
+    "langchain_huggingface.*",
+    "langchain_text_splitters.*",
+    "chromadb.*",
+    "sentence_transformers.*",
+    "streamlit.*",
+    "pysqlite3.*",
+    "pypdf.*",
+]
+ignore_missing_imports = true
