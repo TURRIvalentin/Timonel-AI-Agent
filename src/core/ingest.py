@@ -5,6 +5,7 @@ embeddings, and persists everything to ChromaDB.  This module is pure
 business logic — no CLI output, no Streamlit state, no side effects
 beyond disk I/O.
 """
+
 from __future__ import annotations
 
 import logging
@@ -86,8 +87,7 @@ def chunk_documents(
     )
     chunks = splitter.split_documents(documents)
     logger.info(
-        "Split %d document(s) into %d chunk(s) "
-        "(chunk_size=%d, overlap=%d)",
+        "Split %d document(s) into %d chunk(s) (chunk_size=%d, overlap=%d)",
         len(documents),
         len(chunks),
         chunk_size,

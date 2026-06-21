@@ -1,4 +1,5 @@
 """SQLAlchemy ORM models for Timonel RAG audit logging."""
+
 from __future__ import annotations
 
 import datetime

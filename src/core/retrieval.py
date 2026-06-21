@@ -5,6 +5,7 @@ that returns structured output.  No I/O side effects — no prints, no
 Streamlit state — so the same functions can be consumed by the Streamlit
 UI, the CLI, and the future REST API.
 """
+
 from __future__ import annotations
 
 import logging
@@ -69,7 +70,7 @@ def get_llm(settings: Settings) -> BaseChatModel:
         return ChatOpenAI(
             model=settings.openai_model_name,
             temperature=0,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]
         )
     if provider == "ollama":
         from langchain_community.chat_models import ChatOllama
@@ -112,8 +113,7 @@ def setup_qa_chain(settings: Settings) -> Runnable[dict[str, Any], dict[str, Any
         count = vector_store._collection.count()
         if count == 0:
             raise RuntimeError(
-                "The ChromaDB collection is empty. "
-                "Run `python cli.py ingest` to populate it."
+                "The ChromaDB collection is empty. Run `python cli.py ingest` to populate it."
             )
         logger.info("ChromaDB ready — %d chunks available.", count)
     except RuntimeError:

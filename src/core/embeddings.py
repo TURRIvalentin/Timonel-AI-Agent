@@ -3,6 +3,7 @@
 Both the ingest and retrieval pipelines use this module so the same
 model is never instantiated with inconsistent configurations.
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,7 +32,7 @@ def get_embeddings(settings: Settings) -> Embeddings:
     provider = settings.embeddings_provider
     if provider == "openai":
         logger.info("Embedding backend: OpenAI")
-        return OpenAIEmbeddings(api_key=settings.openai_api_key)
+        return OpenAIEmbeddings(api_key=settings.openai_api_key)  # type: ignore[arg-type]
     if provider == "huggingface":
         logger.info("Embedding backend: HuggingFace — %s", settings.hf_embedding_model)
         return HuggingFaceEmbeddings(model_name=settings.hf_embedding_model)

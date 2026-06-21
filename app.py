@@ -1,4 +1,5 @@
 """Timonel RAG — Streamlit web interface."""
+
 from __future__ import annotations
 
 import sys
@@ -47,9 +48,7 @@ with st.sidebar:
     recent_logs = get_recent_logs(limit=5)
     if recent_logs:
         for log in recent_logs:
-            with st.expander(
-                f"🕒 {log.timestamp.strftime('%H:%M:%S')} — {log.question[:30]}…"
-            ):
+            with st.expander(f"🕒 {log.timestamp.strftime('%H:%M:%S')} — {log.question[:30]}…"):
                 st.write(f"**Q:** {log.question}")
                 st.write(f"**A:** {log.answer[:200]}…")
                 st.caption(f"Sources: {log.sources}")
@@ -83,26 +82,25 @@ if question := st.chat_input("Ask a question about the documents…"):
     with st.chat_message("user"):
         st.markdown(question)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Searching documents and generating answer…"):
-            try:
-                response = st.session_state.qa_chain.invoke({"input": question})
-                answer = response.get("answer", "")
-                sources = response.get("context", [])
+    with st.chat_message("assistant"), st.spinner("Searching documents and generating answer…"):
+        try:
+            response = st.session_state.qa_chain.invoke({"input": question})
+            answer = response.get("answer", "")
+            sources = response.get("context", [])
 
-                st.markdown(answer)
+            st.markdown(answer)
 
-                if sources:
-                    with st.expander("View source passages"):
-                        for i, doc in enumerate(sources):
-                            src = doc.metadata.get("source", "Unknown")
-                            page = doc.metadata.get("page", "?")
-                            st.markdown(f"**Source {i + 1}:** `{src}` — page `{page}`")
-                            st.caption(f'"{doc.page_content[:300]}…"')
+            if sources:
+                with st.expander("View source passages"):
+                    for i, doc in enumerate(sources):
+                        src = doc.metadata.get("source", "Unknown")
+                        page = doc.metadata.get("page", "?")
+                        st.markdown(f"**Source {i + 1}:** `{src}` — page `{page}`")
+                        st.caption(f'"{doc.page_content[:300]}…"')
 
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": answer, "sources": sources}
-                )
-                save_query_log(question, answer, sources)
-            except Exception as exc:
-                st.error(f"Error processing query: {exc}")
+            st.session_state.messages.append(
+                {"role": "assistant", "content": answer, "sources": sources}
+            )
+            save_query_log(question, answer, sources)
+        except Exception as exc:
+            st.error(f"Error processing query: {exc}")

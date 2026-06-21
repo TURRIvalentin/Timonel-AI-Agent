@@ -3,6 +3,7 @@
 Thin data-access layer that keeps SQL concerns out of the business logic
 and UI modules.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,9 +31,7 @@ def save_query_log(
     """
     db = get_session()
     try:
-        sources_str = ", ".join(
-            doc.metadata.get("source", "unknown") for doc in sources
-        )
+        sources_str = ", ".join(doc.metadata.get("source", "unknown") for doc in sources)
         db.add(QueryLog(question=question, answer=answer, sources=sources_str))
         db.commit()
         logger.debug("Query log saved.")
@@ -57,7 +56,7 @@ def get_recent_logs(limit: int = 5) -> list[QueryLog]:
     try:
         return (
             db.query(QueryLog)
-            .order_by(QueryLog.timestamp.desc())
+            .order_by(QueryLog.timestamp.desc(), QueryLog.id.desc())
             .limit(limit)
             .all()
         )

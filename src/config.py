@@ -11,6 +11,7 @@ Usage::
     print(settings.pdf_directory)      # Path object, absolute
     print(settings.embeddings_provider)  # "huggingface" | "openai"
 """
+
 from __future__ import annotations
 
 import logging
@@ -88,11 +89,9 @@ class Settings(BaseSettings):
         return Path(str(v)).expanduser()
 
     @model_validator(mode="after")
-    def _warn_missing_api_key(self) -> "Settings":
+    def _warn_missing_api_key(self) -> Settings:
         """Emit a warning when an OpenAI provider is selected without a key."""
-        needs_key = (
-            self.embeddings_provider == "openai" or self.llm_provider == "openai"
-        )
+        needs_key = self.embeddings_provider == "openai" or self.llm_provider == "openai"
         if needs_key and not self.openai_api_key:
             logger.warning(
                 "OPENAI_API_KEY is not set but an OpenAI provider is configured. "

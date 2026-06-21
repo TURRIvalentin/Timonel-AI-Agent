@@ -3,6 +3,7 @@
 The engine is created lazily on first use from the ``settings`` singleton,
 so importing this module does not immediately open a database connection.
 """
+
 from __future__ import annotations
 
 import logging

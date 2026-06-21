@@ -8,6 +8,7 @@ Usage::
 Both commands read configuration from environment variables / .env file.
 See .env.example for the full list of available settings.
 """
+
 from __future__ import annotations
 
 import argparse
