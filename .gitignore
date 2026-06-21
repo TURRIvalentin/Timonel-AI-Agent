@@ -1,30 +1,51 @@
-# Entornos virtuales
-venv/
-env/
-.env/
-.venv/
-
-# Variables de entorno y secretos
-.env
-.env.local
-
-# Base de datos vectorial (no ignorar, se sube pre-generada para Streamlit Cloud)
-# chroma_db/
-*.sqlite3
-*.db
-
-# Archivos de Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
 
-# Jupyter Notebooks (por si acaso)
-.ipynb_checkpoints
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+.env/
 
-# Logs
+# --- Secrets ---
+.env
+.env.local
+
+# --- Vector store (regenerable artifact — run `python cli.py ingest`) ---
+chroma_db/
+
+# --- Databases ---
+*.sqlite3
+*.db
+
+# --- Testing & coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Build / packaging ---
+dist/
+build/
+*.egg-info/
+
+# --- Type checking ---
+.mypy_cache/
+
+# --- Linting ---
+.ruff_cache/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Logs ---
 *.log
 
-# Entornos y SO
+# --- OS ---
 .DS_Store
 Thumbs.db
