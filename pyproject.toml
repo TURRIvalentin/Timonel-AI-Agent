@@ -1,0 +1,10 @@
+[project]
+name = "timonel-rag"
+version = "0.1.0"
+description = "RAG system for querying nautical PDF documents"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+# Make `from src.xxx import yyy` work in tests without sys.path hacks.
+pythonpath = ["."]
+testpaths = ["tests"]
