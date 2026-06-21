@@ -1,6 +1,27 @@
 # Timonel RAG 📘
 
+[![CI](https://github.com/TURRIvalentin/Timonel-AI-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/TURRIvalentin/Timonel-AI-Agent/actions/workflows/ci.yml)
+[![Docker](https://github.com/TURRIvalentin/Timonel-AI-Agent/actions/workflows/docker.yml/badge.svg)](https://github.com/TURRIvalentin/Timonel-AI-Agent/actions/workflows/docker.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Sistema de Recuperación Aumentada por Generación (RAG) para consultar de manera inteligente un conjunto de documentos PDF locales. Utiliza LangChain, ChromaDB y Streamlit para brindar una interfaz interactiva y fácil de usar.
+
+---
+
+## 🚀 API REST
+
+```bash
+# Local
+uvicorn src.api.main:app --reload
+# Swagger UI → http://localhost:8000/docs
+
+# Docker
+cp .env.example .env   # agregar OPENAI_API_KEY
+docker compose up      # API disponible en http://localhost:8000
+```
+
+Endpoints: `GET /health` · `POST /ingest` · `POST /query`
 
 ## Características
 
