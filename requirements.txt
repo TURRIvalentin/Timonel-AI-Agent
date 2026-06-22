@@ -9,3 +9,7 @@ python-dotenv>=1.0.1
 streamlit>=1.33.0
 sentence-transformers>=2.7.0
 pysqlite3-binary
+sqlalchemy>=2.0.0
+pydantic-settings>=2.0.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0

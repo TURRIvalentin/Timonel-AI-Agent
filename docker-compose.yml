@@ -1,0 +1,58 @@
+services:
+
+  # ---------------------------------------------------------------------------
+  # Timonel RAG — FastAPI service
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: timonel_api
+    ports:
+      # External host port maps to the PORT configured inside the container.
+      - "${PORT:-8000}:${PORT:-8000}"
+    env_file:
+      # All settings (OPENAI_API_KEY, LLM_PROVIDER, …) come from .env.
+      # Copy .env.example → .env and fill in your values before running.
+      - .env
+    volumes:
+      # ./data is mounted so:
+      #   - The container can read PDFs you place in the local data/ folder.
+      #   - The SQLite audit-log (timonel_logs.db) is written here and survives
+      #     container restarts.
+      - ./data:/app/data
+
+      # ./chroma_db persists the vector store across container recreations.
+      # Without this volume, every `docker compose up` would require re-running
+      # POST /ingest to rebuild the index from scratch.
+      - ./chroma_db:/app/chroma_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: local LLM via Ollama (100% offline, no OpenAI key required)
+  #
+  # To enable:
+  #   1. Uncomment the service below.
+  #   2. Set LLM_PROVIDER=ollama in your .env.
+  #   3. Run: docker compose up
+  #
+  # On first startup, Ollama pulls the model (~4 GB for llama3).
+  # Subsequent starts use the cached model from the ollama_models volume.
+  # ---------------------------------------------------------------------------
+  # ollama:
+  #   image: ollama/ollama
+  #   container_name: timonel_ollama
+  #   volumes:
+  #     - ollama_models:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   restart: unless-stopped
+
+# volumes:
+#   ollama_models:

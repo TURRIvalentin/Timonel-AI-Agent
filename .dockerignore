@@ -1,0 +1,37 @@
+# --- Python caches & build artefacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Secrets — NEVER in the image ---
+.env
+
+# --- Dev / test tooling (not needed at runtime) ---
+tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage.xml
+.pre-commit-config.yaml
+
+# --- Data volumes (mounted at runtime, not baked in) ---
+data/
+chroma_db/
+
+# --- Version control & editor noise ---
+.git/
+.gitignore
+.gitattributes
+*.md
