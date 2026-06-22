@@ -1,80 +1,103 @@
-import os
-import logging
-from dotenv import load_dotenv
+"""Application configuration via pydantic-settings.
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+All settings are read from environment variables (case-insensitive) and,
+when present, from a ``.env`` file at the project root.  No value is
+hard-coded to a machine-specific path.
+
+Usage::
+
+    from src.config import settings
+
+    print(settings.pdf_directory)      # Path object, absolute
+    print(settings.embeddings_provider)  # "huggingface" | "openai"
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno desde el archivo .env si existe (uso local)
-load_dotenv()
+# Resolves to the project root regardless of the working directory at runtime.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _get_secret(key: str, default: str = "") -> str:
+class Settings(BaseSettings):
+    """Central, validated configuration for Timonel RAG.
+
+    All attributes map 1-to-1 to an environment variable of the same name
+    (upper-cased).  Defaults are safe for a freshly cloned repo — no
+    absolute paths, no secrets required for the HuggingFace + Ollama path.
+
+    Attributes:
+        pdf_directory: Directory that contains source PDF documents.
+        chroma_db_dir: Persistence directory for the ChromaDB vector store.
+        db_path: SQLite file path for query audit logs.
+        embeddings_provider: Which embedding backend to use.
+        llm_provider: Which LLM backend to use.
+        hf_embedding_model: HuggingFace sentence-transformer model name.
+        openai_model_name: OpenAI chat model identifier.
+        local_llm_model: Ollama model name.
+        retriever_k: Number of chunks returned per retrieval query.
+        chunk_size: Target character count per document chunk.
+        chunk_overlap: Character overlap between consecutive chunks.
+        openai_api_key: OpenAI API key (required for OpenAI providers).
+        log_level: Python logging level name.
     """
-    Lee un valor de configuración con este orden de prioridad:
-    1. Variable de entorno del sistema (incluye Streamlit Cloud secrets que se inyectan como env vars)
-    2. st.secrets (acceso directo al store de Streamlit Cloud)
-    3. Valor por defecto
-    """
-    # 1. Intentar desde variables de entorno (funciona en local con .env y en Streamlit Cloud)
-    value = os.getenv(key, "")
-    if value:
-        return value
 
-    # 2. Intentar desde st.secrets (fallback explícito para Streamlit Cloud)
-    try:
-        import streamlit as st
-        if key in st.secrets:
-            return str(st.secrets[key])
-    except Exception:
-        pass  # Fuera de un contexto de Streamlit, ignorar
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    return default
+    # --- Paths (defaults are absolute so the app is CWD-independent) ---
+    pdf_directory: Path = Field(default=_PROJECT_ROOT / "data")
+    chroma_db_dir: Path = Field(default=_PROJECT_ROOT / "chroma_db")
+    db_path: Path = Field(default=_PROJECT_ROOT / "data" / "timonel_logs.db")
 
+    # --- Providers ---
+    embeddings_provider: Literal["huggingface", "openai"] = "huggingface"
+    llm_provider: Literal["openai", "ollama"] = "openai"
 
-class Config:
-    """Clase para centralizar la configuración del sistema."""
+    # --- Models ---
+    hf_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    openai_model_name: str = "gpt-3.5-turbo"
+    local_llm_model: str = "llama3"
 
+    # --- Retrieval tuning ---
+    retriever_k: int = Field(default=4, ge=1)
+    chunk_size: int = Field(default=1000, ge=100)
+    chunk_overlap: int = Field(default=200, ge=0)
+
+    # --- Secrets ---
+    openai_api_key: str = ""
+
+    # --- Observability ---
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+
+    @field_validator("pdf_directory", "chroma_db_dir", "db_path", mode="before")
     @classmethod
-    def _load(cls):
-        """Carga todos los valores de configuración dinámicamente."""
-        # Rutas
-        cls.PDF_DIRECTORY = _get_secret("PDF_DIRECTORY", "./data")
-        cls.CHROMA_DB_DIR = _get_secret("CHROMA_DB_DIR", "./chroma_db")
+    def _expand_path(cls, v: object) -> Path:
+        """Expand ``~`` in user-provided paths."""
+        return Path(str(v)).expanduser()
 
-        # Proveedores
-        cls.EMBEDDINGS_PROVIDER = _get_secret("EMBEDDINGS_PROVIDER", "huggingface").lower()
-        cls.LLM_PROVIDER = _get_secret("LLM_PROVIDER", "openai").lower()
-
-        # Modelos
-        cls.HF_EMBEDDING_MODEL = _get_secret("HF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-        cls.OPENAI_MODEL_NAME = _get_secret("OPENAI_MODEL_NAME", "gpt-3.5-turbo")
-        cls.LOCAL_LLM_MODEL = _get_secret("LOCAL_LLM_MODEL", "llama3")
-
-        # API Keys
-        cls.OPENAI_API_KEY = _get_secret("OPENAI_API_KEY", "")
-
-    @classmethod
-    def validate(cls):
-        """Valida configuraciones necesarias y loguea advertencias (no crashea al importar)."""
-        cls._load()  # Recargar valores en el momento de la validación
-
-        if not os.path.exists(cls.PDF_DIRECTORY):
-            logger.warning(f"El directorio de PDFs no existe: {cls.PDF_DIRECTORY}")
-
-        if cls.EMBEDDINGS_PROVIDER == "openai" and not cls.OPENAI_API_KEY:
-            logger.error("OPENAI_API_KEY es requerida cuando EMBEDDINGS_PROVIDER es 'openai'")
-
-        if cls.LLM_PROVIDER == "openai" and not cls.OPENAI_API_KEY:
-            logger.error("OPENAI_API_KEY es requerida cuando LLM_PROVIDER es 'openai'")
-
-        logger.info("Configuración cargada.")
-        return cls
+    @model_validator(mode="after")
+    def _warn_missing_api_key(self) -> Settings:
+        """Emit a warning when an OpenAI provider is selected without a key."""
+        needs_key = self.embeddings_provider == "openai" or self.llm_provider == "openai"
+        if needs_key and not self.openai_api_key:
+            logger.warning(
+                "OPENAI_API_KEY is not set but an OpenAI provider is configured. "
+                "Set OPENAI_API_KEY in your .env file or environment."
+            )
+        return self
 
 
-# Carga inicial de valores (sin crashear si falta la API key)
-Config._load()
+settings = Settings()

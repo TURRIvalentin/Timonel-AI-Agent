@@ -1,0 +1,84 @@
+name: Docker Build & Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke-test:
+    name: Build image & verify /health
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build the multi-stage image exactly as documented in the Dockerfile.
+      # No push to any registry — build verification only.
+      - name: Build Docker image
+        run: docker build -t timonel-rag:test .
+
+      # Start the container with env vars that skip heavy I/O at startup:
+      #   EMBEDDINGS_PROVIDER=openai — avoids downloading the HuggingFace model
+      #     (OpenAIEmbeddings is instantiated without any network call).
+      #   OPENAI_API_KEY=sk-dummy   — satisfies the API-key presence check;
+      #     no real OpenAI call is made during startup.
+      #   ANONYMIZED_TELEMETRY=false — disables ChromaDB background telemetry.
+      #
+      # Expected startup path:
+      #   setup_qa_chain → /app/chroma_db exists (created in Dockerfile) →
+      #   OpenAI embeddings object created (no network) →
+      #   ChromaDB opens empty dir → count=0 → RuntimeError("empty") →
+      #   caught by lifespan → app.state.qa_chain = None →
+      #   uvicorn ready → GET /health → 200
+      - name: Start container
+        run: |
+          docker run -d \
+            --name timonel-test \
+            -p 8000:8000 \
+            -e EMBEDDINGS_PROVIDER=openai \
+            -e OPENAI_API_KEY=sk-dummy-for-ci \
+            -e LLM_PROVIDER=openai \
+            -e ANONYMIZED_TELEMETRY=false \
+            timonel-rag:test
+
+      - name: Wait for API to be ready (up to 30 s)
+        run: |
+          echo "Waiting for uvicorn to start…"
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "✓ API ready after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "✗ API did not become ready in 30 s"
+              docker logs timonel-test
+              exit 1
+            fi
+            sleep 1
+          done
+
+      # The health endpoint always returns 200 (status "ok") regardless of
+      # whether the vector store is initialised.  503 is only returned by /query.
+      - name: Smoke test — GET /health returns 200
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" \
+            http://localhost:8000/health)
+          echo "Response body : $(cat /tmp/health.json)"
+          echo "HTTP status   : $HTTP_STATUS"
+          [ "$HTTP_STATUS" = "200" ]
+
+      - name: Print container logs on failure
+        if: failure()
+        run: docker logs timonel-test
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop timonel-test || true
+          docker rm   timonel-test || true
