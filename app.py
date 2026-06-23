@@ -16,9 +16,9 @@ except ImportError:
 import streamlit as st
 
 from src.config import settings
-from src.core.retrieval import setup_qa_chain
 from src.db.repository import get_recent_logs, save_query_log
 from src.db.session import init_db
+from src.startup import init_rag_chain
 
 init_db()
 
@@ -33,13 +33,19 @@ with st.sidebar:
     st.write(f"**Embeddings:** `{settings.embeddings_provider}`")
     st.write(f"**LLM:** `{settings.llm_provider}`")
 
+    if settings.llm_provider == "openai" and not settings.openai_api_key:
+        st.warning(
+            "OPENAI_API_KEY is not configured. Queries will fail until you add "
+            "the key in the Streamlit Cloud **Secrets** dashboard.",
+            icon="⚠️",
+        )
+
     st.markdown("---")
     st.markdown(
         """
-        **Instructions:**
-        1. Run `python cli.py ingest` to index your PDFs.
-        2. Type your question in the input box below.
-        3. The system retrieves relevant passages and generates a grounded answer.
+        **How it works:**
+        On the first launch the app automatically indexes all PDFs in the
+        document library.  Subsequent starts load the pre-built index directly.
         """
     )
 
@@ -55,14 +61,48 @@ with st.sidebar:
     else:
         st.info("No queries recorded yet.")
 
+
+@st.cache_resource(show_spinner=False)
+def _get_rag_chain() -> object:
+    """Build the QA chain once per process; auto-ingests on first run if needed."""
+    return init_rag_chain(settings)
+
+
+# ---------------------------------------------------------------------------
+# One-time chain initialisation
+# @st.cache_resource ensures the (potentially slow) build runs only once per
+# process, regardless of how many times Streamlit re-executes this script.
+# st.session_state prevents re-showing the spinner on every user interaction.
+# ---------------------------------------------------------------------------
 if "qa_chain" not in st.session_state:
+    _needs_first_run = not settings.chroma_db_dir.exists()
+    _banner = st.empty()
+    if _needs_first_run:
+        _banner.info(
+            "First launch detected — indexing the document library. "
+            "This may take 1–2 minutes…",
+            icon="📚",
+        )
     with st.spinner("Initialising RAG system…"):
         try:
-            st.session_state.qa_chain = setup_qa_chain(settings)
-        except Exception as exc:
-            st.error(f"Failed to initialise the RAG system: {exc}")
+            st.session_state.qa_chain = _get_rag_chain()
+        except RuntimeError as exc:
+            _banner.empty()
+            msg = str(exc)
+            if "no pdf files found" in msg.lower():
+                st.error(
+                    f"{msg}\n\nMake sure PDF files are committed to the `data/` "
+                    "folder and redeploy.",
+                    icon="📭",
+                )
+            else:
+                st.error(f"Failed to initialise the RAG system: {exc}", icon="🚨")
             st.stop()
+    _banner.empty()
 
+# ---------------------------------------------------------------------------
+# Chat interface
+# ---------------------------------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -103,4 +143,12 @@ if question := st.chat_input("Ask a question about the documents…"):
             )
             save_query_log(question, answer, sources)
         except Exception as exc:
-            st.error(f"Error processing query: {exc}")
+            err = str(exc)
+            if "api_key" in err.lower() or "authentication" in err.lower() or "401" in err:
+                st.error(
+                    "OpenAI API key is missing or invalid. Add OPENAI_API_KEY to the "
+                    "Streamlit Cloud **Secrets** dashboard.",
+                    icon="🔑",
+                )
+            else:
+                st.error(f"Error processing query: {exc}")
